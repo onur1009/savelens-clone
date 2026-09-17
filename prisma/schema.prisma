@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          String    @default("USER")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  saves         Save[]
+  tags          Tag[]
+  collections   Collection[]
+  smartShelves  SmartShelf[]
+  chatMessages  ChatMessage[]
+  apiKeys       ApiKey[]
+  settings      UserSettings?
+
+  @@index([email])
+}
+
+model UserSettings {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  theme                 String   @default("SYSTEM")
+  language              String   @default("tr")
+  emailNotifications    Boolean  @default(true)
+  weeklyDigest          Boolean  @default(false)
+  autoTagging           Boolean  @default(true)
+  autoTranscription     Boolean  @default(true)
+  defaultCollectionId   String?  @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultCollection     Collection? @relation("UserSettingsDefaultCollection", fields: [defaultCollectionId], references: [id], onDelete: SetNull)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Save {
+  id              String       @id @default(cuid())
+  userId          String
+  url             String
+  title           String?
+  description     String?
+  thumbnailUrl    String?
+  platform        String
+  platformId      String?
+  authorName      String?
+  authorUrl       String?
+  authorAvatar    String?
+  duration        Int?
+  viewCount       Int?
+  likeCount       Int?
+  commentCount    Int?
+  publishedAt     DateTime?
+  savedAt         DateTime     @default(now())
+  processedAt     DateTime?
+  processingStatus String      @default("PENDING")
+  processingError String?
+  isArchived      Boolean      @default(false)
+  isFavorite      Boolean      @default(false)
+  contentType     String       @default("VIDEO")
+  language        String?
+  metadata        String?
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags            SaveTag[]
+  collections     CollectionSave[]
+  transcript      Transcript?
+  summary         Summary?
+  smartExtracts   SmartExtract[]
+
+  @@index([userId, savedAt])
+  @@index([userId, platform])
+  @@index([userId, processingStatus])
+  @@index([platform, platformId])
+}
+
+model Tag {
+  id        String     @id @default(cuid())
+  userId    String
+  name      String
+  color     String     @default("#0ea5e9")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  saves     SaveTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model SaveTag {
+  id        String   @id @default(cuid())
+  saveId    String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  save      Save     @relation(fields: [saveId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([saveId, tagId])
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  color       String   @default("#0ea5e9")
+  icon        String?
+  isPublic    Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  saves       CollectionSave[]
+  smartShelves SmartShelf[]
+  defaultSettings UserSettings? @relation("UserSettingsDefaultCollection")
+
+  @@index([userId])
+}
+
+model CollectionSave {
+  id            String       @id @default(cuid())
+  collectionId  String
+  saveId        String
+  addedAt       DateTime     @default(now())
+
+  collection    Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  save          Save         @relation(fields: [saveId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, saveId])
+}
+
+model SmartShelf {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  query       String
+  description String?
+  color       String   @default("#d946ef")
+  icon        String?
+  collectionId String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collection  Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model Transcript {
+  id           String   @id @default(cuid())
+  saveId       String   @unique
+  fullText     String
+  language     String?
+  duration     Float?
+  segments     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  save         Save     @relation(fields: [saveId], references: [id], onDelete: Cascade)
+}
+
+model Summary {
+  id            String   @id @default(cuid())
+  saveId        String   @unique
+  shortSummary  String
+  detailedSummary String?
+  keyPoints     String
+  topics        String
+  sentiment     String?
+  readingTime   Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  save          Save     @relation(fields: [saveId], references: [id], onDelete: Cascade)
+}
+
+model SmartExtract {
+  id          String   @id @default(cuid())
+  saveId      String
+  type        String
+  title       String
+  data        String
+  confidence  Float    @default(1.0)
+  createdAt   DateTime @default(now())
+
+  save        Save     @relation(fields: [saveId], references: [id], onDelete: Cascade)
+
+  @@index([saveId, type])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String
+  content   String
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  keyHash   String
+  prefix    String
+  lastUsed  DateTime?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ExportJob {
+  id        String      @id @default(cuid())
+  userId    String
+  type      String
+  format    String
+  status    String      @default("PENDING")
+  fileUrl   String?
+  error     String?
+  filters   String?
+  createdAt DateTime    @default(now())
+  completedAt DateTime?
+
+  @@index([userId, createdAt])
+}
